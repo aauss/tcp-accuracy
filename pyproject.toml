@@ -1,0 +1,11 @@
+[project]
+name = "tcp-accuracy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "huggingface-hub<0.25",
+    "pytest>=9.0.2",
+    "ruff>=0.14.13",
+]

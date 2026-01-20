@@ -13,6 +13,8 @@
 # limitations under the License.
 """TODO: Add a description here."""
 
+import re
+
 import evaluate
 import datasets
 
@@ -61,6 +63,8 @@ BAD_WORDS_URL = "http://url/to/external/resource/bad_words.txt"
 class TCPAccuracy(evaluate.Metric):
     """TODO: Short description of my evaluation module."""
 
+    BOXED_ANSWER_PATTERN = r"\\boxed\{([^}]*)\}"
+
     def _info(self):
         # TODO: Specifies the evaluate.EvaluationModuleInfo object
         return evaluate.MetricInfo(
@@ -70,26 +74,36 @@ class TCPAccuracy(evaluate.Metric):
             citation=_CITATION,
             inputs_description=_KWARGS_DESCRIPTION,
             # This defines the format of each prediction and reference
-            features=datasets.Features({
-                'predictions': datasets.Value('int64'),
-                'references': datasets.Value('int64'),
-            }),
+            features=datasets.Features(
+                {
+                    "predictions": datasets.Value("string"),
+                    "references": datasets.Value("string"),
+                }
+            ),
             # Homepage of the module for documentation
             homepage="http://module.homepage",
             # Additional links to the codebase or references
             codebase_urls=["http://github.com/path/to/codebase/of/new_module"],
-            reference_urls=["http://path.to.reference.url/new_module"]
+            reference_urls=["http://path.to.reference.url/new_module"],
         )
 
-    def _download_and_prepare(self, dl_manager):
-        """Optional: download external resources useful to compute the scores"""
-        # TODO: Download external resources if needed
-        pass
+    def extract_boxed_answer(self, predictions):
+        match = re.search(self.BOXED_ANSWER_PATTERN, predictions, re.DOTALL)
+        if match:
+            return match.group(1).replace("GMT", "").strip()
+        return None
 
-    def _compute(self, predictions, references):
+    def _compute(self, predictions, references, subset: str | list[str]):
         """Returns the scores"""
         # TODO: Compute the different scores of the module
-        accuracy = sum(i == j for i, j in zip(predictions, references)) / len(predictions)
+        if isinstance(subset, str):
+            subset = [subset] * len(predictions)
+        predictions = [self.extract_boxed_answer(p) for p in predictions]
+        references = [
+            r.replace("GMT", "").strip() if s == "tcp_short" else r
+            for r, s in zip(references, subset)
+        ]
+        accuracy = [int(i == j) for i, j in zip(predictions, references)]
         return {
             "accuracy": accuracy,
         }
