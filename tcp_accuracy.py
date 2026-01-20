@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""TODO: Add a description here."""
+"""TCP Accuracy metric for evaluating temporal constraint-based planning tasks."""
 
 import re
 
@@ -19,96 +19,95 @@ import evaluate
 import datasets
 
 
-# TODO: Add BibTeX citation
 _CITATION = """\
-@InProceedings{huggingface:module,
-title = {A great new module},
-authors={huggingface, Inc.},
-year={2020}
+@software{abbood2025tcp_accuracy,
+  title={TCP Accuracy},
+  author={Abbood, Auss},
+  year={2025},
+  url={https://huggingface.co/spaces/aauss/tcp_accuracy}
 }
 """
 
-# TODO: Add description of the module here
 _DESCRIPTION = """\
-This new module is designed to solve this great ML task and is crafted with a lot of care.
+This metric evaluates model predictions on the TCP (Temporal Constraint-Based Planning) benchmark
+(Ding et al., 2025). It measures accuracy by extracting answers from LaTeX boxed notation
+(\\boxed{answer}) and comparing them against reference answers using exact string matching.
 """
 
 
-# TODO: Add description of the arguments of the module here
 _KWARGS_DESCRIPTION = """
-Calculates how good are predictions given some references, using certain scores
+Calculates accuracy for TCP benchmark predictions.
 Args:
-    predictions: list of predictions to score. Each predictions
-        should be a string with tokens separated by spaces.
-    references: list of reference for each prediction. Each
-        reference should be a string with tokens separated by spaces.
+    predictions: list of prediction strings. Each prediction should contain the
+        final answer in LaTeX boxed notation: \\boxed{answer}.
+    references: list of reference answer strings.
+    subset: either a string or list of strings indicating the subset type
+        ("tcp_short" or "tcp_long"). For "tcp_short", GMT is stripped before comparison.
+    return_average: if True (default), returns average accuracy as a float.
+        If False, returns a list of binary scores (0 or 1) for each sample.
 Returns:
-    accuracy: description of the first score,
-    another_score: description of the second score,
+    accuracy: float (if return_average=True) or list of int (if return_average=False)
 Examples:
-    Examples should be written in doctest format, and should illustrate how
-    to use the function.
-
-    >>> my_new_module = evaluate.load("my_new_module")
-    >>> results = my_new_module.compute(references=[0, 1], predictions=[0, 1])
+    >>> metric = evaluate.load("aauss/tcp_accuracy")
+    >>> predictions = ["...\\\\boxed{2012-11-05}", "...\\\\boxed{2020-05-28 16:00}"]
+    >>> references = ["2012-11-05", "2020-05-28 16:00 GMT"]
+    >>> results = metric.compute(predictions=predictions, references=references, subset=["tcp_long", "tcp_short"])
     >>> print(results)
     {'accuracy': 1.0}
 """
 
-# TODO: Define external resources urls if needed
-BAD_WORDS_URL = "http://url/to/external/resource/bad_words.txt"
-
 
 @evaluate.utils.file_utils.add_start_docstrings(_DESCRIPTION, _KWARGS_DESCRIPTION)
 class TCPAccuracy(evaluate.Metric):
-    """TODO: Short description of my evaluation module."""
+    """Accuracy metric for the TCP (Temporal Constraint-Based Planning) benchmark."""
 
     BOXED_ANSWER_PATTERN = r"\\boxed\{([^}]*)\}"
 
     def _info(self):
-        # TODO: Specifies the evaluate.EvaluationModuleInfo object
         return evaluate.MetricInfo(
-            # This is the description that will appear on the modules page.
             module_type="metric",
             description=_DESCRIPTION,
             citation=_CITATION,
             inputs_description=_KWARGS_DESCRIPTION,
-            # This defines the format of each prediction and reference
             features=datasets.Features(
                 {
                     "predictions": datasets.Value("string"),
                     "references": datasets.Value("string"),
                 }
             ),
-            # Homepage of the module for documentation
-            homepage="http://module.homepage",
-            # Additional links to the codebase or references
-            codebase_urls=["http://github.com/path/to/codebase/of/new_module"],
-            reference_urls=["http://path.to.reference.url/new_module"],
+            homepage="https://huggingface.co/spaces/aauss/tcp_accuracy",
+            codebase_urls=["https://huggingface.co/spaces/aauss/tcp_accuracy/tree/main"],
+            reference_urls=["https://aclanthology.org/2025.emnlp-main.1142/"],
         )
 
-    def extract_boxed_answer(self, predictions):
-        match = re.search(self.BOXED_ANSWER_PATTERN, predictions, re.DOTALL)
+    def extract_boxed_answer(self, prediction: str) -> str | None:
+        match = re.search(self.BOXED_ANSWER_PATTERN, prediction, re.DOTALL)
         if match:
-            return match.group(1).replace("GMT", "").strip()
+            return match.group(1).strip()
         return None
 
     def _compute(
         self,
-        predictions,
-        references,
+        predictions: list[str],
+        references: list[str],
         subset: str | list[str],
         return_average: bool = True,
-    ):
+    ) -> dict[str, float | list[int]]:
         """Returns the scores"""
+        if not predictions:
+            raise ValueError("predictions cannot be empty")
         if isinstance(subset, str):
             subset = [subset] * len(predictions)
-        predictions = [self.extract_boxed_answer(p) for p in predictions]
+        extracted_predictions = [self.extract_boxed_answer(p) for p in predictions]
+        extracted_predictions = [
+            p.replace("GMT", "").strip() if p and s == "tcp_short" else p
+            for p, s in zip(extracted_predictions, subset)
+        ]
         references = [
             r.replace("GMT", "").strip() if s == "tcp_short" else r
             for r, s in zip(references, subset)
         ]
-        accuracy = [int(i == j) for i, j in zip(predictions, references)]
+        accuracy = [int(i == j) for i, j in zip(extracted_predictions, references)]
         if return_average:
             return {"accuracy": sum(accuracy) / len(accuracy)}
         return {"accuracy": accuracy}
