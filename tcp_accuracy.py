@@ -14,9 +14,23 @@
 """TCP Accuracy metric for evaluating temporal constraint-based planning tasks."""
 
 import re
+from typing import Literal, TypedDict
 
-import evaluate
 import datasets
+import evaluate
+
+SUBSET_TCP_SHORT = "tcp_short"
+SUBSET_TCP_LONG = "tcp_long"
+VALID_SUBSETS = frozenset({SUBSET_TCP_SHORT, SUBSET_TCP_LONG})
+
+SubsetType = Literal["tcp_short", "tcp_long"]
+
+BOXED_ANSWER_PATTERN = r"\\boxed\{([^}]*)\}"
+BOXED_ANSWER_REGEX = re.compile(BOXED_ANSWER_PATTERN, re.DOTALL)
+
+
+class AccuracyResult(TypedDict):
+    accuracy: float | list[int]
 
 
 _CITATION = """\
@@ -61,9 +75,7 @@ Examples:
 class TCPAccuracy(evaluate.Metric):
     """Accuracy metric for the TCP (Temporal Constraint-Based Planning) benchmark."""
 
-    BOXED_ANSWER_PATTERN = r"\\boxed\{([^}]*)\}"
-
-    def _info(self):
+    def _info(self) -> evaluate.MetricInfo:
         return evaluate.MetricInfo(
             module_type="metric",
             description=_DESCRIPTION,
@@ -76,12 +88,14 @@ class TCPAccuracy(evaluate.Metric):
                 }
             ),
             homepage="https://huggingface.co/spaces/aauss/tcp_accuracy",
-            codebase_urls=["https://huggingface.co/spaces/aauss/tcp_accuracy/tree/main"],
+            codebase_urls=[
+                "https://huggingface.co/spaces/aauss/tcp_accuracy/tree/main"
+            ],
             reference_urls=["https://aclanthology.org/2025.emnlp-main.1142/"],
         )
 
     def extract_boxed_answer(self, prediction: str) -> str | None:
-        match = re.search(self.BOXED_ANSWER_PATTERN, prediction, re.DOTALL)
+        match = BOXED_ANSWER_REGEX.search(prediction)
         if match:
             return match.group(1).strip()
         return None
@@ -90,21 +104,26 @@ class TCPAccuracy(evaluate.Metric):
         self,
         predictions: list[str],
         references: list[str],
-        subset: str | list[str],
+        subset: SubsetType | list[SubsetType],
         return_average: bool = True,
-    ) -> dict[str, float | list[int]]:
+    ) -> AccuracyResult:
         """Returns the scores"""
         if not predictions:
             raise ValueError("predictions cannot be empty")
+        if len(predictions) != len(references):
+            raise ValueError(
+                f"predictions and references must have same length, "
+                f"got {len(predictions)} and {len(references)}"
+            )
         if isinstance(subset, str):
             subset = [subset] * len(predictions)
         extracted_predictions = [self.extract_boxed_answer(p) for p in predictions]
         extracted_predictions = [
-            p.replace("GMT", "").strip() if p and s == "tcp_short" else p
+            p.replace("GMT", "").strip() if p and s == SUBSET_TCP_SHORT else p
             for p, s in zip(extracted_predictions, subset)
         ]
         references = [
-            r.replace("GMT", "").strip() if s == "tcp_short" else r
+            r.replace("GMT", "").strip() if s == SUBSET_TCP_SHORT else r
             for r, s in zip(references, subset)
         ]
         accuracy = [int(i == j) for i, j in zip(extracted_predictions, references)]

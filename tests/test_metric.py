@@ -30,4 +30,4 @@ def test_metric():
         references=references,
         subset=subsets,
     )
-    assert results["accuracy"] == 2/3
+    assert results["accuracy"] == 2 / 3
