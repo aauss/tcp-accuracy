@@ -21,5 +21,13 @@ def test_metric():
         predictions=[response_1, response_2, response_3],
         references=references,
         subset=subsets,
+        return_average=False,
     )
     assert results["accuracy"] == [1, 0, 1]
+    metric = TCPAccuracy()
+    results = metric.compute(
+        predictions=[response_1, response_2, response_3],
+        references=references,
+        subset=subsets,
+    )
+    assert results["accuracy"] == 2/3

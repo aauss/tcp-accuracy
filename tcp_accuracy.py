@@ -93,9 +93,14 @@ class TCPAccuracy(evaluate.Metric):
             return match.group(1).replace("GMT", "").strip()
         return None
 
-    def _compute(self, predictions, references, subset: str | list[str]):
+    def _compute(
+        self,
+        predictions,
+        references,
+        subset: str | list[str],
+        return_average: bool = True,
+    ):
         """Returns the scores"""
-        # TODO: Compute the different scores of the module
         if isinstance(subset, str):
             subset = [subset] * len(predictions)
         predictions = [self.extract_boxed_answer(p) for p in predictions]
@@ -104,6 +109,6 @@ class TCPAccuracy(evaluate.Metric):
             for r, s in zip(references, subset)
         ]
         accuracy = [int(i == j) for i, j in zip(predictions, references)]
-        return {
-            "accuracy": accuracy,
-        }
+        if return_average:
+            return {"accuracy": sum(accuracy) / len(accuracy)}
+        return {"accuracy": accuracy}
