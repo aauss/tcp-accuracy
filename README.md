@@ -16,8 +16,8 @@ sdk_version: 6.3.0
 app_file: app.py
 pinned: false
 emoji: ⏰
-colorFrom: red
-colorTo: green
+colorFrom: pink
+colorTo: red
 ---
 
 # Metric Card for TCP Accuracy
